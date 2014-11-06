@@ -15,12 +15,17 @@ PREFIX="${PASSWORD_STORE_DIR:-$HOME/.password-store}"
 X_SELECTION="${PASSWORD_STORE_X_SELECTION:-clipboard}"
 CLIP_TIME="${PASSWORD_STORE_CLIP_TIME:-45}"
 
-export GIT_DIR="${PASSWORD_STORE_GIT:-$PREFIX}/.git"
-export GIT_WORK_TREE="${PASSWORD_STORE_GIT:-$PREFIX}"
-
 #
 # BEGIN helper functions
 #
+find_git_dir() {
+  dir=$(dirname $1)
+  cd $dir
+  PASSWORD_STORE_GIT=$(git rev-parse --show-toplevel $dir | tail -n 1)
+  [[ -d ${PASSWORD_STORE_GIT} ]] || return
+  export GIT_DIR="${PASSWORD_STORE_GIT:-$PREFIX}/.git"
+  export GIT_WORK_TREE="${PASSWORD_STORE_GIT:-$PREFIX}"
+}
 
 git_add_file() {
 	[[ -d $GIT_DIR ]] || return
@@ -194,7 +199,6 @@ tmpdir() {
 GETOPT="getopt"
 SHRED="shred -f -z"
 
-source "$(dirname "$0")/platform/$(uname | cut -d _ -f 1 | tr '[:upper:]' '[:lower:]').sh" 2>/dev/null # PLATFORM_FUNCTION_FILE
 
 #
 # END platform definable
@@ -282,6 +286,7 @@ cmd_init() {
 
 	local gpg_id="$PREFIX/$id_path/.gpg-id"
 
+        #find_git_dir "$passfile"
 	if [[ $# -eq 1 && -z $1 ]]; then
 		[[ ! -f "$gpg_id" ]] && die "Error: $gpg_id does not exist and so cannot be removed."
 		rm -v -f "$gpg_id" || exit 1
@@ -408,6 +413,7 @@ cmd_insert() {
 		read -r -p "Enter password for $path: " -e password
 		$GPG -e "${GPG_RECIPIENT_ARGS[@]}" -o "$passfile" "${GPG_OPTS[@]}" <<<"$password"
 	fi
+  find_git_dir "$passfile"
 	git_add_file "$passfile" "Add given password for $path to store."
 }
 
@@ -434,6 +440,7 @@ cmd_edit() {
 	while ! $GPG -e "${GPG_RECIPIENT_ARGS[@]}" -o "$passfile" "${GPG_OPTS[@]}" "$tmp_file"; do
 		yesno "GPG encryption failed. Would you like to try again?"
 	done
+  find_git_dir "$passfile"
 	git_add_file "$passfile" "$action password for $path using ${EDITOR:-vi}."
 }
 
@@ -476,6 +483,7 @@ cmd_generate() {
 	fi
 	local verb="Add"
 	[[ $inplace -eq 1 ]] && verb="Replace"
+  find_git_dir "$passfile"
 	git_add_file "$passfile" "$verb generated password for ${path}."
 
 	if [[ $clip -eq 0 ]]; then
@@ -508,6 +516,7 @@ cmd_delete() {
 	[[ $force -eq 1 ]] || yesno "Are you sure you would like to delete $path?"
 
 	rm $recursive -f -v "$passfile"
+  find_git_dir "$passfile"
 	if [[ -d $GIT_DIR && ! -e $passfile ]]; then
 		git rm -qr "$passfile"
 		git_commit "Remove $path from store."
@@ -561,6 +570,7 @@ cmd_copy_move() {
 }
 
 cmd_git() {
+  find_git_dir "$2"
 	if [[ $1 == "init" ]]; then
 		git "$@" || exit 1
 		git_add_file "$PREFIX" "Add current contents of password store."

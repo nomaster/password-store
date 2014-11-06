@@ -21,7 +21,7 @@ CLIP_TIME="${PASSWORD_STORE_CLIP_TIME:-45}"
 find_git_dir() {
   dir=$(dirname $1)
   cd $dir
-  PASSWORD_STORE_GIT=$(git rev-parse --show-toplevel $dir | tail -n 1)
+  PASSWORD_STORE_GIT=$(git rev-parse --show-toplevel $dir | head -n 1)
   [[ -d ${PASSWORD_STORE_GIT} ]] || return
   export GIT_DIR="${PASSWORD_STORE_GIT:-$PREFIX}/.git"
   export GIT_WORK_TREE="${PASSWORD_STORE_GIT:-$PREFIX}"
